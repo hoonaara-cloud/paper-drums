@@ -143,9 +143,29 @@ void PaperDrumsAudioProcessor::triggerPadOnAudioThread(int pad, float velocity)
     selected->maxHostSamples = juce::jmax(1, static_cast<int>(durations[static_cast<size_t>(pad)] * currentSampleRate));
     selected->gain = gains[static_cast<size_t>(pad)] * velocity;
     selected->age = ++voiceAge;
+    selected->releaseSamplesRemaining = 0;
+    selected->releasing = false;
     selected->active = true;
 
     padActivity[static_cast<size_t>(pad)].store(1.0f);
+}
+
+void PaperDrumsAudioProcessor::stopPadOnAudioThread(int pad)
+{
+    if (pad < 0 || pad >= padCount)
+        return;
+
+    // A short release avoids a click while still following the MIDI note length.
+    const auto releaseLength = juce::jmax(1, static_cast<int>(0.008 * currentSampleRate));
+
+    for (auto& voice : voices)
+    {
+        if (voice.active && voice.pad == pad)
+        {
+            voice.releasing = true;
+            voice.releaseSamplesRemaining = releaseLength;
+        }
+    }
 }
 
 void PaperDrumsAudioProcessor::renderVoices(juce::AudioBuffer<float>& buffer,
@@ -167,6 +187,7 @@ void PaperDrumsAudioProcessor::renderVoices(juce::AudioBuffer<float>& buffer,
         const auto& sample = samples[static_cast<size_t>(voice.pad)];
         const auto* source = sample.buffer.getReadPointer(0);
         const auto sourceLength = sample.buffer.getNumSamples();
+        const auto releaseLength = juce::jmax(1, static_cast<int>(0.008 * currentSampleRate));
 
         for (int offset = 0; offset < numSamples; ++offset)
         {
@@ -187,6 +208,15 @@ void PaperDrumsAudioProcessor::renderVoices(juce::AudioBuffer<float>& buffer,
             const auto fadeSamples = juce::jmin(256, voice.maxHostSamples / 4);
             if (fadeSamples > 0 && remaining < fadeSamples)
                 value *= static_cast<float>(remaining) / static_cast<float>(fadeSamples);
+
+            if (voice.releasing)
+            {
+                value *= static_cast<float>(voice.releaseSamplesRemaining)
+                       / static_cast<float>(releaseLength);
+
+                if (--voice.releaseSamplesRemaining <= 0)
+                    voice.active = false;
+            }
 
             value *= voice.gain;
 
@@ -221,19 +251,20 @@ void PaperDrumsAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         cursor = eventPosition;
 
         const auto message = metadata.getMessage();
-        if (message.isNoteOn())
+        const auto note = message.getNoteNumber();
+        const std::array<int, padCount> notes = {{ 36, 38, 42, 46, 49 }};
+
+        for (int pad = 0; pad < padCount; ++pad)
         {
-            const auto note = message.getNoteNumber();
-            const auto velocity = message.getFloatVelocity();
-            const std::array<int, padCount> notes = {{ 36, 38, 42, 46, 49 }};
-            for (int pad = 0; pad < padCount; ++pad)
-            {
-                if (note == notes[static_cast<size_t>(pad)])
-                {
-                    triggerPadOnAudioThread(pad, velocity);
-                    break;
-                }
-            }
+            if (note != notes[static_cast<size_t>(pad)])
+                continue;
+
+            if (message.isNoteOn())
+                triggerPadOnAudioThread(pad, message.getFloatVelocity());
+            else if (message.isNoteOff())
+                stopPadOnAudioThread(pad);
+
+            break;
         }
     }
 
