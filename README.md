@@ -12,7 +12,7 @@ A small JUCE/C++ VST3 drum instrument made from paper foley. The editor is drawn
   - **HAT** — pencil on paper, short and pitched up.
   - **TEAR** — torn paper.
   - **CRUMPLE** — crumpled paper.
-- MIDI notes: C1 / 36 Kick, D1 / 38 Snare, F#1 / 42 Hat, A#1 / 46 Tear, C#2 / 49 Crumple.
+- MIDI notes: C1 / 36 Kick, D1 / 38 Snare, F#1 / 42 Hat, A#1 / 46 Tear, C#2 / 49 Crumple. Note-off is respected, so the MIDI note length controls how long a hit is allowed to play; a very short release fade prevents clicks.
 - The four WAV assets are CC0 / public-domain-equivalent releases. See `CREDITS.md`.
 
 ## Build on Windows
