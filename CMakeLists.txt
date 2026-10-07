@@ -7,16 +7,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(JUCE_ENABLE_MODULE_SOURCE_GROUPS ON CACHE BOOL "" FORCE)
 
 if (DEFINED JUCE_SOURCE_DIR)
-    # Use -DJUCE_SOURCE_DIR=C:/path/to/JUCE for an offline build.
     add_subdirectory(${JUCE_SOURCE_DIR} JUCE)
 else()
     include(FetchContent)
+
     FetchContent_Declare(
         JUCE
         GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
         GIT_TAG 8.0.8
         GIT_SHALLOW TRUE
     )
+
     FetchContent_MakeAvailable(JUCE)
 endif()
 
@@ -44,6 +45,8 @@ juce_add_plugin(PaperDrums
     FORMATS VST3 Standalone
     PRODUCT_NAME "Paper Drums"
 )
+
+juce_generate_juce_header(PaperDrums)
 
 target_sources(PaperDrums PRIVATE
     Source/PluginProcessor.cpp
