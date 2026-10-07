@@ -37,17 +37,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout PaperDrumsAudioProcessor::cr
     return { params.begin(), params.end() };
 }
 
-void PaperDrumsAudioProcessor::prepareToPlay(double sampleRate, int)
+void PaperDrumsAudioProcessor::decayPadActivity(float amount)
 {
-    currentSampleRate = juce::jmax(1.0, sampleRate);
+    amount = juce::jlimit(0.0f, 1.0f, amount);
 
-    for (auto& voice : voices)
-        voice = {};
-
-    voiceAge = 0;
-    loadSamples();
+    for (int i = 0; i < padCount; ++i)
+    {
+        auto& value = padActivity[static_cast<size_t>(i)];
+        value.store(value.load() * amount);
+    }
 }
-
 void PaperDrumsAudioProcessor::releaseResources()
 {
     for (auto& voice : voices)
