@@ -71,6 +71,8 @@ private:
         int maxHostSamples = 0;
         float gain = 0.0f;
         unsigned long long age = 0;
+        int releaseSamplesRemaining = 0;
+        bool releasing = false;
         bool active = false;
     };
 
