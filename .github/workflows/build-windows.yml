@@ -1,0 +1,71 @@
+name: Build Paper Drums VST3 for Windows
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-vst3:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -B build -S . -A x64
+
+      - name: Build Release VST3
+        run: cmake --build build --config Release --parallel 2
+
+      - name: Package VST3
+        shell: pwsh
+        run: |
+          $plugin = "build/PaperDrums_artefacts/Release/VST3/Paper Drums.vst3"
+
+          if (!(Test-Path $plugin)) {
+            Write-Error "The VST3 bundle was not found"
+            Get-ChildItem -Path build -Recurse -Directory
+            exit 1
+          }
+
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+
+          Compress-Archive `
+            -Path $plugin `
+            -DestinationPath "dist/PaperDrums-VST3-Windows.zip" `
+            -Force
+
+          Copy-Item "README.md" "dist/README-PaperDrums.txt"
+          Copy-Item "CREDITS.md" "dist/CREDITS-PaperDrums.txt"
+
+      - name: Upload downloadable VST3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PaperDrums-VST3-Windows
+          path: |
+            dist/PaperDrums-VST3-Windows.zip
+            dist/README-PaperDrums.txt
+            dist/CREDITS-PaperDrums.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach VST3 to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            "dist/PaperDrums-VST3-Windows.zip" \
+            --title "Paper Drums ${{ github.ref_name }}" \
+            --generate-notes
